@@ -10,6 +10,7 @@
             background-color: #f4f4f4;
             margin: 0;
             padding: 20px;
+            text-align: center;
         }
         .container {
             max-width: 600px;
@@ -20,17 +21,23 @@
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
         h1 {
-            text-align: center;
             color: #333;
         }
         .item {
-            margin: 20px 0;
+            margin: 15px 0;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
+            background: #f9f9f9;
         }
         .item-label {
             font-weight: bold;
+        }
+        #clock {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            margin: 10px 0;
         }
     </style>
 </head>
@@ -38,21 +45,38 @@
 
 <div class="container">
     <h1>Inventory Dashboard</h1>
+    
+    <!-- Live Clock -->
     <div class="item">
-        <span class="item-label">PCs:</span>
-        <span id="numberOfComputers">20</span>
+        <span class="item-label">Current Time:</span>
+        <span id="clock">--:--:--</span>
+    </div>
+
+    <div class="item">
+        <span class="item-label">UWIAN NA</span>
+        <span id="numberOfComputers"></span>
     </div>
     <div class="item">
-        <span class="item-label">Floor:</span>
-        <span id="totalFloorArea">500</span>
+        <span class="item-label">BOSS!!</span>
+        <span id="numberOfComputers"></span>
     </div>
-    <div class="item">
-        <span class="item-label">Inv</span>
-        <span id="totalFloorArea">50
-        </span>
-    </div>
+    
+    
     <p>The Divoom device will display the above information.</p>
 </div>
+
+<script>
+    // Function to update clock every second
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString(); // Get current time in HH:MM:SS format
+        document.getElementById("clock").textContent = timeString;
+    }
+    
+    // Update the clock every second
+    setInterval(updateClock, 1000);
+    updateClock(); // Initial call to set the time immediately
+</script>
 
 </body>
 </html>
