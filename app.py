@@ -46,7 +46,8 @@ definitions.create(swagger)
 
 @app.route('/', methods=['GET'])
 def home():
-    return redirect(url_for('flasgger.apidocs'))
+    return redirect(url_for('inventory'))  # Redirect to /inventory instead of /apidocs
+
 
 @app.route('/health', methods=['GET'])
 def health():
