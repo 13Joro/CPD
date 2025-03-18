@@ -3,80 +3,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            margin: 0;
-            padding: 20px;
-            text-align: center;
+    <title>Inventory Management</title>
+    <script>
+        function updateInventory(type) {
+            let value = parseInt(document.getElementById(type).value);
+            if (isNaN(value)) {
+                alert("Please enter a valid number.");
+                return;
+            }
+            fetch(`/update?${type}=${value}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === "success") {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert("Error: " + data.message);
+                    }
+                })
+                .catch(error => console.error("Error:", error));
         }
-        .container {
-            max-width: 600px;
-            margin: auto;
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-        h1 {
-            color: #333;
-        }
-        .item {
-            margin: 15px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            background: #f9f9f9;
-        }
-        .item-label {
-            font-weight: bold;
-        }
-        #clock {
-            font-size: 24px;
-            font-weight: bold;
-            color: #007bff;
-            margin: 10px 0;
-        }
-    </style>
+    </script>
 </head>
 <body>
+    <h1>Inventory Management</h1>
+    <p><strong>PCs:</strong> {{ pcs }}</p>
+    <input type="number" id="pcs" placeholder="Enter PCs value">
+    <button onclick="updateInventory('pcs')">Update PCs</button>
 
-<div class="container">
-    <h1>Inventory Dashboard</h1>
-    
-    <!-- Live Clock -->
-    <div class="item">
-        <span class="item-label">Current Time:</span>
-        <span id="clock">--:--:--</span>
-    </div>
+    <p><strong>Floor:</strong> {{ floor }}</p>
+    <input type="number" id="floor" placeholder="Enter Floor value">
+    <button onclick="updateInventory('floor')">Update Floor</button>
 
-    <div class="item">
-        <span class="item-label">UWIAN NA</span>
-        <span id="numberOfComputers"></span>
-    </div>
-    <div class="item">
-        <span class="item-label">BOSS!!</span>
-        <span id="numberOfComputers"></span>
-    </div>
-    
-    
-    <p>The Divoom device will display the above information.</p>
-</div>
-
-<script>
-    // Function to update clock every second
-    function updateClock() {
-        const now = new Date();
-        const timeString = now.toLocaleTimeString(); // Get current time in HH:MM:SS format
-        document.getElementById("clock").textContent = timeString;
-    }
-    
-    // Update the clock every second
-    setInterval(updateClock, 1000);
-    updateClock(); // Initial call to set the time immediately
-</script>
-
+    <p><strong>Inv:</strong> {{ inv }}</p>
+    <input type="number" id="inv" placeholder="Enter Inv value">
+    <button onclick="updateInventory('inv')">Update Inv</button>
 </body>
 </html>

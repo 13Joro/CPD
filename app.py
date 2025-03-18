@@ -49,11 +49,15 @@ def read_inventory():
         next(reader)  # Skip headers
         return list(map(int, next(reader)))  # Convert values to integers
 
-def update_inventory(pcs=None):
+def update_inventory(pcs=None, floor=None, inv=None):
     """Update inventory values in CSV."""
     data = read_inventory()
     if pcs is not None:
-        data[0] = max(0, data[0] + pcs)  # Ensure non-negative PCs
+        data[0] = max(0, pcs)  # Ensure non-negative PCs
+    if floor is not None:
+        data[1] = max(0, floor)  # Ensure non-negative Floor
+    if inv is not None:
+        data[2] = max(0, inv)  # Ensure non-negative Inv
     
     with open(INVENTORY_FILE, "w", newline="") as file:
         writer = csv.writer(file)
@@ -67,27 +71,22 @@ def update_pixoo_display():
             current_time = time.strftime("%H:%M:%S")  # Get current time in HH:MM:SS format
             pcs, floor, inv = read_inventory()  # Read inventory data
 
-            print(f"[DEBUG] Updating Pixoo display with time: {current_time} and PCs: {pcs}")
+            print(f"[DEBUG] Updating Pixoo display with time: {current_time}, PCs: {pcs}, Floor: {floor}, Inv: {inv}")
 
             # Clear previous screen (optional)
             pixoo.clear()
 
             # Draw Clock (Centered horizontally)
-            pixoo.draw_text_at_location_rgb(
-                current_time,  # Live time string
-                16,  # X position (Centered for better alignment)
-                5,   # Y position (Top)
-                0, 255, 0  # Green color for time
-            )
+            pixoo.draw_text_at_location_rgb(current_time, 16, 5, 0, 255, 0)  # Green for time
 
-            # Draw Inventory Data (Below the Clock)
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 10, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb(f"PCs: {pcs}", 10, 15, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 20, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb(f"Floor: {floor}", 10, 25, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 30, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb(f"Inv: {inv}", 10, 35, 255, 255, 255)  # White text
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 40, 255, 255, 255)  # White text
+            # Draw Inventory Data
+            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 10, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb(f"PCs: {pcs}", 10, 15, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 20, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb(f"Floor: {floor}", 10, 25, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 30, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb(f"Inv: {inv}", 10, 35, 255, 255, 255)
+            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 40, 255, 255, 255)
 
             pixoo.push()  # Update Pixoo screen
             time.sleep(1)  # Update every second
@@ -111,9 +110,17 @@ def inventory():
 @app.route('/update', methods=['GET'])
 def update():
     try:
-        pcs = int(request.args.get("pcs", 0))
-        update_inventory(pcs=pcs)
-        return jsonify({"status": "success", "message": f"Updated PCs by {pcs}"}), 200
+        pcs = request.args.get("pcs", type=int)
+        floor = request.args.get("floor", type=int)
+        inv = request.args.get("inv", type=int)
+
+        update_inventory(pcs=pcs, floor=floor, inv=inv)
+
+        return jsonify({
+            "status": "success",
+            "message": f"Updated inventory - PCs: {pcs}, Floor: {floor}, Inv: {inv}"
+        }), 200
+
     except ValueError:
         return jsonify({"status": "error", "message": "Invalid input"}), 400
 
