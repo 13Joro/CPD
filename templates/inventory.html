@@ -4,39 +4,84 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inventory Management</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 50px;
+        }
+
+        h1 {
+            margin-bottom: 20px;
+        }
+
+        input {
+            margin: 10px;
+            padding: 5px;
+            width: 150px;
+        }
+
+        button {
+            padding: 8px 15px;
+            margin: 5px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        #resetBtn {
+            background-color: #dc3545;
+        }
+
+        #resetBtn:hover {
+            background-color: #a71d2a;
+        }
+    </style>
     <script>
-        function updateInventory(type) {
-            let value = parseInt(document.getElementById(type).value);
-            if (isNaN(value)) {
-                alert("Please enter a valid number.");
-                return;
-            }
-            fetch(`/update?${type}=${value}`)
+        function updateInventory() {
+            let pcs = parseInt(document.getElementById("pcs").value) || 0;
+            let floor = parseInt(document.getElementById("floor").value) || 0;
+            let inv = parseInt(document.getElementById("inv").value) || 0;
+
+            fetch(`/update?pcs=${pcs}&floor=${floor}&inv=${inv}`)
                 .then(response => response.json())
                 .then(data => {
-                    if (data.status === "success") {
-                        alert(data.message);
-                        location.reload();
-                    } else {
-                        alert("Error: " + data.message);
-                    }
+                    alert(data.message);
+                    location.reload();
                 })
-                .catch(error => console.error("Error:", error));
+                .catch(error => console.error("Error updating inventory:", error));
+        }
+
+        function resetInventory() {
+            fetch('/reset', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                    location.reload();
+                })
+                .catch(error => console.error("Error resetting inventory:", error));
         }
     </script>
 </head>
 <body>
     <h1>Inventory Management</h1>
+
     <p><strong>PCs:</strong> {{ pcs }}</p>
-    <input type="number" id="pcs" placeholder="Enter PCs value">
-    <button onclick="updateInventory('pcs')">Update PCs</button>
+    <input type="number" id="pcs" placeholder="Enter PCs value"><br>
 
     <p><strong>Floor:</strong> {{ floor }}</p>
-    <input type="number" id="floor" placeholder="Enter Floor value">
-    <button onclick="updateInventory('floor')">Update Floor</button>
+    <input type="number" id="floor" placeholder="Enter Floor value"><br>
 
     <p><strong>Inv:</strong> {{ inv }}</p>
-    <input type="number" id="inv" placeholder="Enter Inv value">
-    <button onclick="updateInventory('inv')">Update Inv</button>
+    <input type="number" id="inv" placeholder="Enter Inv value"><br>
+
+    <button onclick="updateInventory()">Update Inventory</button>
+    <button id="resetBtn" onclick="resetInventory()">Reset Inventory</button>
 </body>
 </html>
