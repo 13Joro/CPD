@@ -51,8 +51,7 @@
 
             fetch(`/update?pcs=${pcs}&floor=${floor}&inv=${inv}`)
                 .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
+                .then(() => {
                     location.reload();
                 })
                 .catch(error => console.error("Error updating inventory:", error));
@@ -61,8 +60,7 @@
         function resetInventory() {
             fetch('/reset', { method: 'POST' })
                 .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
+                .then(() => {
                     location.reload();
                 })
                 .catch(error => console.error("Error resetting inventory:", error));
