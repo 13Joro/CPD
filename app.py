@@ -1,6 +1,7 @@
 import os
 import time
 import threading
+import csv
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from pixoo import Pixoo
@@ -20,9 +21,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # Inventory data
 inventory_data = {
-    "pcs": 5,
-    "floor": 500,
-    "inv": 10
+    "pcs": 0,
+    "floor": 0,
+    "inv": 0
 }
 
 # Function to load pixel sprite from an image
@@ -55,6 +56,22 @@ animation_frames = [load_pixel_sprite(path) for path in frame_paths]
 
 # Global flag to control animation loop
 running_animation = True
+
+# Function to read inventory data from CSV
+def read_inventory_from_csv():
+    csv_path = os.path.join(BASE_DIR, "inventory.csv")
+    try:
+        with open(csv_path, mode='r') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                inventory_data["pcs"] = int(row.get("pcs", inventory_data["pcs"]))
+                inventory_data["floor"] = int(row.get("floor", inventory_data["floor"]))
+                inventory_data["inv"] = int(row.get("inv", inventory_data["inv"]))
+        print(f"[DEBUG] Inventory updated from CSV: {inventory_data}")
+    except FileNotFoundError:
+        print(f"[ERROR] CSV file not found at {csv_path}")
+    except Exception as e:
+        print(f"[ERROR] Failed to read inventory from CSV: {e}")
 
 def draw_static_ui():
     """ Draws the static UI on the Pixoo. """
@@ -105,6 +122,13 @@ def inventory():
                            pcs=inventory_data["pcs"], 
                            floor=inventory_data["floor"], 
                            inv=inventory_data["inv"])
+
+@app.route('/update_inventory_from_csv', methods=['POST'])
+def update_inventory_from_csv():
+    """Manually trigger inventory update from CSV."""
+    read_inventory_from_csv()
+    draw_static_ui()  # Update Pixoo display after reading CSV
+    return jsonify({"status": "success", "message": "Inventory updated from CSV", "inventory": inventory_data})
 
 @app.route('/update')
 def update_inventory():
