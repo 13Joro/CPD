@@ -1,139 +1,140 @@
 import os
-import sys
 import time
 import threading
-import csv
+from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
-from flask import Flask, request, redirect, url_for, render_template, jsonify
 from pixoo import Pixoo
+from PIL import Image
 
-import _helpers
-
+# Load environment variables
 load_dotenv()
 
-pixoo_host = os.environ.get('PIXOO_HOST', 'Pixoo64')
-pixoo_screen = int(os.environ.get('PIXOO_SCREEN_SIZE', 64))
-pixoo_debug = _helpers.parse_bool_value(os.environ.get('PIXOO_DEBUG', 'false'))
-pixoo_test_connection_retries = int(os.environ.get('PIXOO_TEST_CONNECTION_RETRIES', sys.maxsize))
-
-print(f"[DEBUG] Attempting to connect to Pixoo at {pixoo_host}")
-
-for connection_test_count in range(pixoo_test_connection_retries + 1):
-    if _helpers.try_to_request(f'http://{pixoo_host}/get'):
-        print(f"[DEBUG] Connection successful on attempt {connection_test_count + 1}")
-        break
-    else:
-        print(f"[ERROR] Connection attempt {connection_test_count + 1} failed. Retrying...")
-        if connection_test_count == pixoo_test_connection_retries:
-            sys.exit(f"[FATAL] Failed to connect to [{pixoo_host}]. Exiting.")
-        time.sleep(5)
-
-pixoo = Pixoo(pixoo_host, pixoo_screen, pixoo_debug)
+# Configure Pixoo
+pixoo_host = os.environ.get('PIXOO_HOST', '10.108.32.240')  # Replace with your Pixoo IP
+pixoo = Pixoo(pixoo_host)
 
 app = Flask(__name__)
 
-INVENTORY_FILE = "inventory.csv"
+# Get the base directory
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def initialize_inventory():
-    if not os.path.exists(INVENTORY_FILE):
-        with open(INVENTORY_FILE, "w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["PCs", "Floor", "Inv"])
-            writer.writerow([0, 0, 0])
+# Inventory data
+inventory_data = {
+    "pcs": 5,
+    "floor": 500,
+    "inv": 10
+}
 
-def read_inventory():
-    with open(INVENTORY_FILE, "r") as file:
-        reader = csv.reader(file)
-        next(reader)
-        return list(map(int, next(reader)))
+# Function to load pixel sprite from an image
+def load_pixel_sprite(image_path):
+    img = Image.open(image_path).convert("RGB")
+    img = img.resize((10, 10))  # Ensure sprite is 10x10
 
-def update_inventory(pcs=None, floor=None, inv=None):
-    data = read_inventory()
-    if pcs is not None:
-        data[0] = max(0, pcs)
-    if floor is not None:
-        data[1] = max(0, floor)
-    if inv is not None:
-        data[2] = max(0, inv)
-    
-    with open(INVENTORY_FILE, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["PCs", "Floor", "Inv"])
-        writer.writerow(data)
+    pixels = []
+    for y in range(img.height):
+        row = []
+        for x in range(img.width):
+            row.append(img.getpixel((x, y)))
+        pixels.append(row)
 
-def reset_inventory():
-    with open(INVENTORY_FILE, "w", newline="") as file:
-        writer = csv.writer(file)
-        writer.writerow(["PCs", "Floor", "Inv"])
-        writer.writerow([0, 0, 0])
+    return pixels
 
-def update_pixoo_display():
-    while True:
-        try:
-            current_time = time.strftime("%H:%M:%S")
-            pcs, floor, inv = read_inventory()
+# Load animation frames
+frame_paths = [
+    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-0.png"),
+    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-1.png"),
+    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-2.png"),
+    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-3.png"),
+]
 
-            print(f"[DEBUG] Updating Pixoo display with time: {current_time} and PCs: {pcs}")
+# Check if files exist
+for path in frame_paths:
+    print(f"Checking: {path} - Exists: {os.path.exists(path)}")
 
-            pixoo.clear()
+animation_frames = [load_pixel_sprite(path) for path in frame_paths]
 
-            pixoo.draw_text_at_location_rgb(current_time, 16, 5, 0, 255, 0)
+# Global flag to control animation loop
+running_animation = True
 
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 10, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb(f"PCs: {pcs}", 10, 15, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 20, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb(f"Floor: {floor}", 10, 25, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 30, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb(f"Inv: {inv}", 10, 35, 255, 255, 255)
-            pixoo.draw_text_at_location_rgb("---------------------------------------------", 0, 40, 255, 255, 255)
+def draw_static_ui():
+    """ Draws the static UI on the Pixoo. """
+    for y in range(64):
+        for x in range(64):
+            pixoo.draw_pixel_at_location_rgb(x, y, 255, 255, 255)  # White background
+
+    pixoo.draw_text("PCS:", (15, 10), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['pcs']}", (50, 10), (0, 0, 0))
+
+    pixoo.draw_text("FLOOR:", (15, 35), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['floor']}", (50, 35), (0, 0, 0))
+
+    pixoo.draw_text("INV:", (15, 55), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['inv']}", (50, 55), (0, 0, 0))
+
+    pixoo.push()  # Send to Pixoo
+
+def animate_sprite():
+    """ Continuously animates the sprite inside the first box without erasing UI. """
+    sprite_x, sprite_y = 6, 6
+
+    while running_animation:
+        for frame in animation_frames:
+            for y in range(10):
+                for x in range(10):
+                    pixoo.draw_pixel_at_location_rgb(sprite_x + x, sprite_y + y, 255, 255, 255)  # White background
+
+            for y in range(len(frame)):
+                for x in range(len(frame[y])):
+                    r, g, b = frame[y][x]
+                    pixoo.draw_pixel_at_location_rgb(sprite_x + x, sprite_y + y, r, g, b)
 
             pixoo.push()
             time.sleep(1)
-        
-        except Exception as e:
-            print(f"[ERROR] Failed to update Pixoo display: {e}")
 
-clock_thread = threading.Thread(target=update_pixoo_display, daemon=True)
-clock_thread.start()
+# Start UI and Animation in separate threads
+threading.Thread(target=draw_static_ui, daemon=True).start()
+threading.Thread(target=animate_sprite, daemon=True).start()
 
 @app.route('/')
 def home():
-    return redirect(url_for('inventory'))
+    return 'Pixoo Inventory Dashboard'
 
 @app.route('/inventory')
 def inventory():
-    pcs, floor, inv = read_inventory()
-    return render_template('inventory.html', pcs=pcs, floor=floor, inv=inv)
+    return render_template('inventory.html', 
+                           pcs=inventory_data["pcs"], 
+                           floor=inventory_data["floor"], 
+                           inv=inventory_data["inv"])
 
-@app.route('/update', methods=['GET'])
-def update():
-    try:
-        pcs = request.args.get("pcs")
-        floor = request.args.get("floor")
-        inv = request.args.get("inv")
+@app.route('/update')
+def update_inventory():
+    pcs = request.args.get("pcs", type=int)
+    floor = request.args.get("floor", type=int)
+    inv = request.args.get("inv", type=int)
 
-        pcs = int(pcs) if pcs is not None else None
-        floor = int(floor) if floor is not None else None
-        inv = int(inv) if inv is not None else None
+    if pcs is not None:
+        inventory_data["pcs"] = pcs
+    if floor is not None:
+        inventory_data["floor"] = floor
+    if inv is not None:
+        inventory_data["inv"] = inv
 
-        update_inventory(pcs=pcs, floor=floor, inv=inv)
-        return jsonify({"status": "success", "message": "Inventory updated successfully"}), 200
-    except ValueError:
-        return jsonify({"status": "error", "message": "Invalid input"}), 400
+    draw_static_ui()  # Update Pixoo display after change
+
+    return jsonify({"status": "success", "updated_inventory": inventory_data})
 
 @app.route('/reset', methods=['POST'])
-def reset():
-    try:
-        reset_inventory()
-        return jsonify({"status": "success", "message": "Inventory has been reset"}), 200
-    except Exception as e:
-        return jsonify({"status": "error", "message": f"Failed to reset inventory: {e}"}), 500
+def reset_inventory():
+    inventory_data["pcs"] = 0
+    inventory_data["floor"] = 0
+    inventory_data["inv"] = 0
+
+    draw_static_ui()  # Update Pixoo display after reset
+
+    return jsonify({"status": "success", "message": "Inventory reset to default values"})
 
 if __name__ == '__main__':
-    initialize_inventory()
-    print("[DEBUG] Starting Flask server...")
-    app.run(
-        debug=_helpers.parse_bool_value(os.environ.get('PIXOO_REST_DEBUG', 'false')),
-        host=os.environ.get('PIXOO_REST_HOST', '127.0.0.1'),
-        port=int(os.environ.get('PIXOO_REST_PORT', '5000'))
-    )
+    try:
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    except KeyboardInterrupt:
+        running_animation = False  # Stop animation when exiting
