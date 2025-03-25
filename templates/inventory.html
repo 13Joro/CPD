@@ -48,9 +48,15 @@
             let pcs = parseInt(document.getElementById("pcs").value) || 0;
             let floor = parseInt(document.getElementById("floor").value) || 0;
             let inv = parseInt(document.getElementById("inv").value) || 0;
+            let prk = parseInt(document.getElementById("prk").value) || 0;
 
-            fetch(`/update?pcs=${pcs}&floor=${floor}&inv=${inv}`)
-                .then(response => response.json())
+            fetch(`/update?pcs=${pcs}&floor=${floor}&inv=${inv}&prk=${prk}`, { method: 'GET' })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
                 .then(() => {
                     location.reload();
                 })
@@ -71,13 +77,16 @@
     <h1>Inventory Management</h1>
 
     <p><strong>PCs:</strong> {{ pcs }}</p>
-    <input type="number" id="pcs" placeholder="Enter PCs value"><br>
+    <input type="number" id="pcs" placeholder="Enter PCs value" value="{{ pcs }}"><br>
 
     <p><strong>Floor:</strong> {{ floor }}</p>
-    <input type="number" id="floor" placeholder="Enter Floor value"><br>
+    <input type="number" id="floor" placeholder="Enter Floor value" value="{{ floor }}"><br>
 
     <p><strong>Inv:</strong> {{ inv }}</p>
-    <input type="number" id="inv" placeholder="Enter Inv value"><br>
+    <input type="number" id="inv" placeholder="Enter Inv value" value="{{ inv }}"><br>
+
+    <p><strong>Perk:</strong> {{ prk }}</p>
+    <input type="number" id="prk" placeholder="Enter Perk value" value="{{ prk }}"><br>
 
     <button onclick="updateInventory()">Update Inventory</button>
     <button id="resetBtn" onclick="resetInventory()">Reset Inventory</button>

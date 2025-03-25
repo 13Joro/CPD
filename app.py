@@ -11,20 +11,34 @@ from PIL import Image
 load_dotenv()
 
 # Configure Pixoo
-pixoo_host = os.environ.get('PIXOO_HOST', '10.108.32.240')  # Replace with your Pixoo IP
+pixoo_host = os.environ.get('PIXOO_HOST', '10.108.32.253')  # Replace with your Pixoo IP
 pixoo = Pixoo(pixoo_host)
 
 app = Flask(__name__)
 
 # Get the base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, "inventory.csv")
+
+# Load inventory data from CSV
+def load_inventory():
+    if not os.path.exists(CSV_FILE):
+        save_inventory({"pcs": 0, "floor": 0, "inv": 0, "prk": 0})
+    
+    with open(CSV_FILE, mode='r') as file:
+        reader = csv.DictReader(file)
+        row = next(reader, None)
+        return {key: int(value) for key, value in row.items()} if row else {"pcs": 0, "floor": 0, "inv": 0, "prk": 0}
+
+# Save inventory data to CSV
+def save_inventory(data):
+    with open(CSV_FILE, mode='w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=["pcs", "floor", "inv", "prk"])
+        writer.writeheader()
+        writer.writerow(data)
 
 # Inventory data
-inventory_data = {
-    "pcs": 0,
-    "floor": 0,
-    "inv": 0
-}
+inventory_data = load_inventory()
 
 # Function to load pixel sprite from an image
 def load_pixel_sprite(image_path):
@@ -48,30 +62,10 @@ frame_paths = [
     os.path.join(BASE_DIR, "static", "animations", "pixil-layer-3.png"),
 ]
 
-# Check if files exist
-for path in frame_paths:
-    print(f"Checking: {path} - Exists: {os.path.exists(path)}")
-
-animation_frames = [load_pixel_sprite(path) for path in frame_paths]
+animation_frames = [load_pixel_sprite(path) for path in frame_paths if os.path.exists(path)]
 
 # Global flag to control animation loop
 running_animation = True
-
-# Function to read inventory data from CSV
-def read_inventory_from_csv():
-    csv_path = os.path.join(BASE_DIR, "inventory.csv")
-    try:
-        with open(csv_path, mode='r') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                inventory_data["pcs"] = int(row.get("pcs", inventory_data["pcs"]))
-                inventory_data["floor"] = int(row.get("floor", inventory_data["floor"]))
-                inventory_data["inv"] = int(row.get("inv", inventory_data["inv"]))
-        print(f"[DEBUG] Inventory updated from CSV: {inventory_data}")
-    except FileNotFoundError:
-        print(f"[ERROR] CSV file not found at {csv_path}")
-    except Exception as e:
-        print(f"[ERROR] Failed to read inventory from CSV: {e}")
 
 def draw_static_ui():
     """ Draws the static UI on the Pixoo. """
@@ -79,14 +73,17 @@ def draw_static_ui():
         for x in range(64):
             pixoo.draw_pixel_at_location_rgb(x, y, 255, 255, 255)  # White background
 
-    pixoo.draw_text("PCS:", (15, 10), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['pcs']}", (50, 10), (0, 0, 0))
+    pixoo.draw_text("PCS:", (20, 10), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['pcs']}", (45, 10), (0, 0, 0))
 
-    pixoo.draw_text("FLOOR:", (15, 35), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['floor']}", (50, 35), (0, 0, 0))
+    pixoo.draw_text("FLR:", (20, 25), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['floor']}", (45, 25), (0, 0, 0))
 
-    pixoo.draw_text("INV:", (15, 55), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['inv']}", (50, 55), (0, 0, 0))
+    pixoo.draw_text("INV:", (20, 40), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['inv']}", (45, 40), (0, 0, 0))
+
+    pixoo.draw_text("PERK:", (20, 55), (0, 0, 0))
+    pixoo.draw_text(f"{inventory_data['prk']}", (45, 55), (0, 0, 0))
 
     pixoo.push()  # Send to Pixoo
 
@@ -121,20 +118,15 @@ def inventory():
     return render_template('inventory.html', 
                            pcs=inventory_data["pcs"], 
                            floor=inventory_data["floor"], 
-                           inv=inventory_data["inv"])
-
-@app.route('/update_inventory_from_csv', methods=['POST'])
-def update_inventory_from_csv():
-    """Manually trigger inventory update from CSV."""
-    read_inventory_from_csv()
-    draw_static_ui()  # Update Pixoo display after reading CSV
-    return jsonify({"status": "success", "message": "Inventory updated from CSV", "inventory": inventory_data})
+                           inv=inventory_data["inv"],
+                           prk=inventory_data["prk"])
 
 @app.route('/update')
 def update_inventory():
     pcs = request.args.get("pcs", type=int)
     floor = request.args.get("floor", type=int)
     inv = request.args.get("inv", type=int)
+    prk = request.args.get("prk", type=int)
 
     if pcs is not None:
         inventory_data["pcs"] = pcs
@@ -142,17 +134,19 @@ def update_inventory():
         inventory_data["floor"] = floor
     if inv is not None:
         inventory_data["inv"] = inv
+    if prk is not None:
+        inventory_data["prk"] = prk
 
+    save_inventory(inventory_data)
     draw_static_ui()  # Update Pixoo display after change
 
     return jsonify({"status": "success", "updated_inventory": inventory_data})
 
 @app.route('/reset', methods=['POST'])
 def reset_inventory():
-    inventory_data["pcs"] = 0
-    inventory_data["floor"] = 0
-    inventory_data["inv"] = 0
+    inventory_data.update({"pcs": 0, "floor": 0, "inv": 0, "prk": 0})
 
+    save_inventory(inventory_data)
     draw_static_ui()  # Update Pixoo display after reset
 
     return jsonify({"status": "success", "message": "Inventory reset to default values"})
