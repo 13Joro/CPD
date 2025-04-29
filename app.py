@@ -1,50 +1,38 @@
 import os
 import time
 import threading
-import csv
 from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from pixoo import Pixoo
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
 # Load environment variables
 load_dotenv()
 
 # Configure Pixoo
-pixoo_host = os.environ.get('PIXOO_HOST', '10.108.32.253')  # Replace with your Pixoo IP
+pixoo_host = os.getenv('PIXOO_HOST', '10.108.32.240')  # Replace with your Pixoo IP
 pixoo = Pixoo(pixoo_host)
 
 app = Flask(__name__)
 
 # Get the base directory
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_FILE = os.path.join(BASE_DIR, "inventory.csv")
 
-# Load inventory data from CSV
-def load_inventory():
-    if not os.path.exists(CSV_FILE):
-        save_inventory({"pcs": 0, "floor": 0, "inv": 0, "prk": 0})
-    
-    with open(CSV_FILE, mode='r') as file:
-        reader = csv.DictReader(file)
-        row = next(reader, None)
-        return {key: int(value) for key, value in row.items()} if row else {"pcs": 0, "floor": 0, "inv": 0, "prk": 0}
+# Ensure directories exist for uploaded images and employee pictures
+os.makedirs(os.path.join(BASE_DIR, "static", "uploaded"), exist_ok=True)
+os.makedirs(os.path.join(BASE_DIR, "static", "employees"), exist_ok=True)
 
-# Save inventory data to CSV
-def save_inventory(data):
-    with open(CSV_FILE, mode='w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=["pcs", "floor", "inv", "prk"])
-        writer.writeheader()
-        writer.writerow(data)
+# Path to the Cloudstaff logo
+LOGO_PATH = os.path.join(BASE_DIR, "static", "cloudstaff_logo.png")
 
-# Inventory data
-inventory_data = load_inventory()
+# Control variable for stopping GIF animation
+gif_running = False
+gif_thread = None
 
 # Function to load pixel sprite from an image
-def load_pixel_sprite(image_path):
-    img = Image.open(image_path).convert("RGB")
-    img = img.resize((10, 10))  # Ensure sprite is 10x10
-
+def load_pixel_sprite(img):
+    img = img.convert("RGB")
+    img = img.resize((64, 64))
     pixels = []
     for y in range(img.height):
         row = []
@@ -54,105 +42,154 @@ def load_pixel_sprite(image_path):
 
     return pixels
 
-# Load animation frames
-frame_paths = [
-    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-0.png"),
-    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-1.png"),
-    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-2.png"),
-    os.path.join(BASE_DIR, "static", "animations", "pixil-layer-3.png"),
-]
+# Function to clear the Pixoo display with a logo and message
+def clear_pixoo():
+    global gif_running
+    gif_running = False  # Stop any running GIF
+    if gif_thread is not None:
+        gif_thread.join()  # Wait for the GIF thread to finish
 
-animation_frames = [load_pixel_sprite(path) for path in frame_paths if os.path.exists(path)]
+    img = Image.new('RGB', (64, 64), color=(128, 128, 128))  # Gray background for visibility
+    draw = ImageDraw.Draw(img)
 
-# Global flag to control animation loop
-running_animation = True
+    # Load and place the Cloudstaff logo
+    if os.path.exists(LOGO_PATH):
+        logo = Image.open(LOGO_PATH).convert("RGB").resize((32, 32))
+        img.paste(logo, (16, 5))
 
-def draw_static_ui():
-    """ Draws the static UI on the Pixoo. """
-    for y in range(64):
-        for x in range(64):
-            pixoo.draw_pixel_at_location_rgb(x, y, 255, 255, 255)  # White background
+    # Use the default font for text
+    default_font = ImageFont.load_default()
+    text = "No image"
 
-    pixoo.draw_text("PCS:", (20, 10), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['pcs']}", (45, 10), (0, 0, 0))
+    # Calculate text size and placement
+    w, h = draw.textbbox((0, 0), text, font=default_font)[2:]
+    draw.text(((64 - w) // 2, 40), text, font=default_font, fill=(255, 255, 255))  # Position text below the logo
 
-    pixoo.draw_text("FLR:", (20, 25), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['floor']}", (45, 25), (0, 0, 0))
-
-    pixoo.draw_text("INV:", (20, 40), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['inv']}", (45, 40), (0, 0, 0))
-
-    pixoo.draw_text("PERK:", (20, 55), (0, 0, 0))
-    pixoo.draw_text(f"{inventory_data['prk']}", (45, 55), (0, 0, 0))
-
-    pixoo.push()  # Send to Pixoo
-
-def animate_sprite():
-    """ Continuously animates the sprite inside the first box without erasing UI. """
-    sprite_x, sprite_y = 6, 6
-
-    while running_animation:
-        for frame in animation_frames:
-            for y in range(10):
-                for x in range(10):
-                    pixoo.draw_pixel_at_location_rgb(sprite_x + x, sprite_y + y, 255, 255, 255)  # White background
-
-            for y in range(len(frame)):
-                for x in range(len(frame[y])):
-                    r, g, b = frame[y][x]
-                    pixoo.draw_pixel_at_location_rgb(sprite_x + x, sprite_y + y, r, g, b)
-
-            pixoo.push()
-            time.sleep(1)
-
-# Start UI and Animation in separate threads
-threading.Thread(target=draw_static_ui, daemon=True).start()
-threading.Thread(target=animate_sprite, daemon=True).start()
+    # Send background image to Pixoo
+    pixels = load_pixel_sprite(img)
+    for y in range(len(pixels)):
+        for x in range(len(pixels[y])):
+            r, g, b = pixels[y][x]
+            pixoo.draw_pixel_at_location_rgb(x, y, r, g, b)
+    pixoo.push()
 
 @app.route('/')
 def home():
-    return 'Pixoo Inventory Dashboard'
+    return render_template('inventory.html')
 
-@app.route('/inventory')
-def inventory():
-    return render_template('inventory.html', 
-                           pcs=inventory_data["pcs"], 
-                           floor=inventory_data["floor"], 
-                           inv=inventory_data["inv"],
-                           prk=inventory_data["prk"])
+@app.route('/clear_display', methods=['POST'])
+def clear_display():
+    clear_pixoo()
+    return jsonify({"status": "success", "message": "Display cleared and ready for new images."})
 
-@app.route('/update')
-def update_inventory():
-    pcs = request.args.get("pcs", type=int)
-    floor = request.args.get("floor", type=int)
-    inv = request.args.get("inv", type=int)
-    prk = request.args.get("prk", type=int)
+def handle_image_upload(file, extension):
+    uploaded_image_path = os.path.join(BASE_DIR, "static", "uploaded", f"uploaded_image.{extension}")
+    file.save(uploaded_image_path)
 
-    if pcs is not None:
-        inventory_data["pcs"] = pcs
-    if floor is not None:
-        inventory_data["floor"] = floor
-    if inv is not None:
-        inventory_data["inv"] = inv
-    if prk is not None:
-        inventory_data["prk"] = prk
+    # Load and send the new image to Pixoo
+    image_pixels = load_pixel_sprite(Image.open(uploaded_image_path))
+    for y in range(len(image_pixels)):
+        for x in range(len(image_pixels[y])):
+            r, g, b = image_pixels[y][x]
+            pixoo.draw_pixel_at_location_rgb(x, y, r, g, b)
+    pixoo.push()
 
-    save_inventory(inventory_data)
-    draw_static_ui()  # Update Pixoo display after change
+    return jsonify({"status": "success", "message": f"{extension.upper()} image uploaded and displayed"})
 
-    return jsonify({"status": "success", "updated_inventory": inventory_data})
+@app.route('/upload_image_png', methods=['POST'])
+def upload_image_png():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file uploaded"})
 
-@app.route('/reset', methods=['POST'])
-def reset_inventory():
-    inventory_data.update({"pcs": 0, "floor": 0, "inv": 0, "prk": 0})
+    file = request.files['file']
+    clear_pixoo()  # Clear the display before updating
+    
+    file_extension = file.filename.split('.')[-1].lower()
+    if file_extension not in ['png', 'jpg', 'jpeg']:
+        return jsonify({"status": "error", "message": "Invalid image file type"})
+    
+    return handle_image_upload(file, file_extension)
 
-    save_inventory(inventory_data)
-    draw_static_ui()  # Update Pixoo display after reset
+def process_gif(file):
+    global gif_running, gif_thread
 
-    return jsonify({"status": "success", "message": "Inventory reset to default values"})
+    file_path = os.path.join(BASE_DIR, "static", "uploaded", "uploaded_image.gif")
+    file.save(file_path)
+    
+    # Extract frames from GIF
+    with Image.open(file_path) as img:
+        frames = []
+        for frame_index in range(img.n_frames):
+            img.seek(frame_index)
+            frame_pixels = load_pixel_sprite(img)
+            frames.append(frame_pixels)
+
+    # Function to display GIF animation
+    def display_gif():
+        global gif_running
+        gif_running = True
+        while gif_running:
+            for frame in frames:
+                if not gif_running:
+                    return
+                for y in range(len(frame)):
+                    for x in range(len(frame[y])):
+                        r, g, b = frame[y][x]
+                        pixoo.draw_pixel_at_location_rgb(x, y, r, g, b)
+                pixoo.push()
+                time.sleep(0.1)
+
+    # Start animation in a separate thread
+    gif_thread = threading.Thread(target=display_gif)
+    gif_thread.start()
+
+    return jsonify({"status": "success", "message": "GIF uploaded and animated"})
+
+@app.route('/upload_image_gif', methods=['POST'])
+def upload_image_gif():
+    if 'file' not in request.files:
+        return jsonify({"status": "error", "message": "No file uploaded"})
+
+    file = request.files['file']
+    clear_pixoo()  # Clear the display before updating
+    return process_gif(file)
+
+@app.route('/view_profile', methods=['POST'])
+def view_profile():
+    employee_name = request.json.get('name')
+    img_file_name = f"{employee_name.lower().replace(' ', '_')}.png"
+    img_path = os.path.join(BASE_DIR, "static", "employees", img_file_name)
+
+    # Debugging output
+    print(f"Received request for employee: {employee_name}")
+    print(f"Expected image path: {img_path}")
+
+    if os.path.exists(img_path):
+        print(f"Image found for {employee_name}, attempting to display.")
+        load_and_display_image(img_path)
+        return jsonify({"status": "success", "message": f"Displaying {employee_name}'s image on Pixoo."})
+    else:
+        print(f"Image not found for {employee_name}.")
+        return jsonify({"status": "error", "message": f"Image for {employee_name} not found."})
+
+def load_and_display_image(img_path):
+    try:
+        img = Image.open(img_path).convert("RGB")
+        img = img.resize((64, 64))
+        pixels = load_pixel_sprite(img)
+
+        for y in range(len(pixels)):
+            for x in range(len(pixels[y])):
+                r, g, b = pixels[y][x]
+                pixoo.draw_pixel_at_location_rgb(x, y, r, g, b)
+        pixoo.push()
+        print(f"Successfully pushed image to Pixoo device.")
+
+    except Exception as e:
+        print(f"Error displaying image: {e}")
 
 if __name__ == '__main__':
     try:
         app.run(debug=True, host='0.0.0.0', port=5000)
     except KeyboardInterrupt:
-        running_animation = False  # Stop animation when exiting
+        pass  # Stop application safely

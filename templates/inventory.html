@@ -3,92 +3,186 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inventory Management</title>
+    <title>Cloudstaff Pixoo Display</title>
     <style>
         body {
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 50px;
+            background-color: #e0f7fa;
+            font-family: 'Open Sans', sans-serif;
+            color: #333;
+            margin: 0;
+            padding: 20px;
         }
 
         h1 {
-            margin-bottom: 20px;
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 40px;
         }
 
-        input {
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            width: 200px;
+            text-align: center;
+            padding: 20px;
             margin: 10px;
-            padding: 5px;
-            width: 150px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .card img {
+            border-radius: 50%;
+            width: 100px;
+            height: 100px;
+            object-fit: cover;
+            margin-bottom: 10px;
+        }
+
+        .card h2 {
+            margin: 10px 0;
+            color: #007bff;
         }
 
         button {
-            padding: 8px 15px;
-            margin: 5px;
-            border: none;
-            background-color: #007bff;
+            background-color: #0056b3;
             color: white;
-            cursor: pointer;
+            border: none;
+            padding: 10px 20px;
             border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
         }
 
         button:hover {
-            background-color: #0056b3;
+            background-color: #003c82;
         }
 
-        #resetBtn {
-            background-color: #dc3545;
-        }
-
-        #resetBtn:hover {
-            background-color: #a71d2a;
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
         }
     </style>
     <script>
-        function updateInventory() {
-            let pcs = parseInt(document.getElementById("pcs").value) || 0;
-            let floor = parseInt(document.getElementById("floor").value) || 0;
-            let inv = parseInt(document.getElementById("inv").value) || 0;
-            let prk = parseInt(document.getElementById("prk").value) || 0;
-
-            fetch(`/update?pcs=${pcs}&floor=${floor}&inv=${inv}&prk=${prk}`, { method: 'GET' })
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(() => {
-                    location.reload();
-                })
-                .catch(error => console.error("Error updating inventory:", error));
+        // JavaScript functions unchanged
+        function displayEmployeeInfo(name) {
+            fetch('/view_profile', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name: name })
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+            })
+            .catch(error => console.error("Error displaying employee image:", error));
         }
 
-        function resetInventory() {
-            fetch('/reset', { method: 'POST' })
+        function uploadImage() {
+            const formData = new FormData(document.getElementById('imageForm'));
+
+            fetch('/upload_image_png', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    alert("Image uploaded successfully");
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(error => console.error("Error uploading image:", error));
+        }
+
+        function uploadGif() {
+            const formData = new FormData(document.getElementById('gifForm'));
+
+            fetch('/upload_image_gif', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === "success") {
+                    alert("GIF uploaded successfully");
+                } else {
+                    alert("Error: " + data.message);
+                }
+            })
+            .catch(error => console.error("Error uploading GIF:", error));
+        }
+
+        function clearDisplay() {
+            fetch('/clear_display', { method: 'POST' })
                 .then(response => response.json())
-                .then(() => {
-                    location.reload();
+                .then(data => {
+                    if (data.status === "success") {
+                        alert("Display cleared and backup message shown");
+                    } else {
+                        alert("Error: " + data.message);
+                    }
                 })
-                .catch(error => console.error("Error resetting inventory:", error));
+                .catch(error => console.error("Error clearing display:", error));
         }
     </script>
 </head>
 <body>
-    <h1>Inventory Management</h1>
-
-    <p><strong>PCs:</strong> {{ pcs }}</p>
-    <input type="number" id="pcs" placeholder="Enter PCs value" value="{{ pcs }}"><br>
-
-    <p><strong>Floor:</strong> {{ floor }}</p>
-    <input type="number" id="floor" placeholder="Enter Floor value" value="{{ floor }}"><br>
-
-    <p><strong>Inv:</strong> {{ inv }}</p>
-    <input type="number" id="inv" placeholder="Enter Inv value" value="{{ inv }}"><br>
-
-    <p><strong>Perk:</strong> {{ prk }}</p>
-    <input type="number" id="prk" placeholder="Enter Perk value" value="{{ prk }}"><br>
-
-    <button onclick="updateInventory()">Update Inventory</button>
-    <button id="resetBtn" onclick="resetInventory()">Reset Inventory</button>
+    <h1>Cloudstaff Pixoo Display</h1>
+    <div class="container">
+        <div class="card">
+            <img src="https://media.licdn.com/dms/image/v2/D4D03AQF17oG6HTR0qg/profile-displayphoto-shrink_800_800/B4DZSOJGSrHcAc-/0/1737551537994?e=1751500800&v=beta&t=RE41EThl3YSiWNCbGHhM96sBLALSf65RhX4UFIZFVbM" alt="Employee">
+            <h2>Employee 1</h2>
+            <button onclick="displayEmployeeInfo('Employee 1')">View Profile</button>
+        </div>
+        <div class="card">
+            <img src="https://avatars.githubusercontent.com/u/140568363?v=4" alt="Employee">
+            <h2>Employee 2</h2>
+            <button onclick="displayEmployeeInfo('Employee 2')">View Profile</button>
+        </div>
+        <div class="card">
+            <img src="https://i.pinimg.com/736x/f5/2f/3b/f52f3b40d181c29219373cb499d4c489.jpg" alt="Employee">
+            <h2>Employee 3</h2>
+            <button onclick="displayEmployeeInfo('Employee 3')">View Profile</button>
+        </div>
+        <div class="card">
+            <img src="https://i.pinimg.com/736x/7d/f2/b1/7df2b1f33575f72854a9db3ce7327a27.jpg" alt="Employee">
+            <h2>Employee 4</h2>
+            <button onclick="displayEmployeeInfo('Employee 4')">View Profile</button>
+        </div>
+    </div>
+    <div class="container">
+        <div class="card">
+            <h2>Upload Image</h2>
+            <form id="imageForm" enctype="multipart/form-data">
+                <input type="file" name="file" accept="image/png, image/jpeg">
+                <button type="button" onclick="uploadImage()">Upload Image</button>
+            </form>
+        </div>
+        <div class="card">
+            <h2>Upload GIF</h2>
+            <form id="gifForm" enctype="multipart/form-data">
+                <input type="file" name="file" accept="image/gif">
+                <button type="button" onclick="uploadGif()">Upload GIF</button>
+            </form>
+        </div>
+    </div>
+    <div class="button-container">
+        <button id="clearBtn" onclick="clearDisplay()">Clear Display</button>
+    </div>
 </body>
 </html>
