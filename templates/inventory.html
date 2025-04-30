@@ -139,6 +139,15 @@
                 })
                 .catch(error => console.error("Error clearing display:", error));
         }
+
+        function displayPHTime() {
+            fetch('/display_time', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch(error => console.error("Error displaying time:", error));
+        }
     </script>
 </head>
 <body>
@@ -180,6 +189,10 @@
                 <button type="button" onclick="uploadGif()">Upload GIF</button>
             </form>
         </div>
+    </div>
+
+    <div class="button-container">
+        <button onclick="displayPHTime()">Show PH Time on Pixoo</button>
     </div>
     <div class="button-container">
         <button id="clearBtn" onclick="clearDisplay()">Clear Display</button>

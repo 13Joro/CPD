@@ -1,3 +1,4 @@
+import datetime
 import os
 import time
 import threading
@@ -5,6 +6,8 @@ from flask import Flask, render_template, request, jsonify
 from dotenv import load_dotenv
 from pixoo import Pixoo
 from PIL import Image, ImageDraw, ImageFont
+from datetime import datetime, timedelta
+
 
 # Load environment variables
 load_dotenv()
@@ -188,8 +191,29 @@ def load_and_display_image(img_path):
     except Exception as e:
         print(f"Error displaying image: {e}")
 
+@app.route('/display_time', methods=['POST'])
+def display_time():
+    display_time_on_pixoo()
+    return jsonify({"status": "success", "message": "Time displayed on Pixoo."})
+
+def display_time_on_pixoo():
+    current_utc_time = datetime.utcnow()
+    ph_time = current_utc_time + timedelta(hours=8)
+    formatted_time = ph_time.strftime('%H:%M')
+
+    img = Image.new('RGB', (64, 64), color=(0, 0, 0))
+    draw = ImageDraw.Draw(img)
+    default_font = ImageFont.load_default()
+
+    w, h = draw.textbbox((0, 0), formatted_time, font=default_font)[2:]
+    draw.text(((64 - w) // 2, (64 - h) // 2), formatted_time, font=default_font, fill=(255, 255, 255))
+    
+    pixels = load_pixel_sprite(img)
+    for y in range(len(pixels)):
+        for x in range(len(pixels[y])):
+            r, g, b = pixels[y][x]
+            pixoo.draw_pixel_at_location_rgb(x, y, r, g, b)
+    pixoo.push()
+
 if __name__ == '__main__':
-    try:
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    except KeyboardInterrupt:
-        pass  # Stop application safely
+    app.run(debug=True, host='0.0.0.0', port=5000)
