@@ -148,6 +148,24 @@
                 })
                 .catch(error => console.error("Error displaying time:", error));
         }
+
+        function startRealTimeClock() {
+            fetch('/start_real_time_clock', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch(error => console.error("Error starting real-time clock:", error));
+        }
+
+        function stopRealTimeClock() {
+            fetch('/stop_real_time_clock', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                })
+                .catch(error => console.error("Error stopping real-time clock:", error));
+        }
     </script>
 </head>
 <body>
@@ -192,7 +210,11 @@
     </div>
 
     <div class="button-container">
-        <button onclick="displayPHTime()">Show PH Time on Pixoo</button>
+        <button onclick="startRealTimeClock()">Start Real-Time Clock</button>
+        &nbsp;
+        &nbsp;
+        &nbsp;
+        <button onclick="stopRealTimeClock()">Stop Real-Time Clock</button>
     </div>
     <div class="button-container">
         <button id="clearBtn" onclick="clearDisplay()">Clear Display</button>
